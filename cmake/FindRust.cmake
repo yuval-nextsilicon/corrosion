@@ -127,6 +127,31 @@ function(_corrosion_parse_target_triple target_triple out_arch out_vendor out_os
     set("${out_env}" "${CMAKE_MATCH_6}" PARENT_SCOPE)
 endfunction()
 
+function(_corrosion_determine_libs_new target_triple out_libs)
+    execute_process(
+        COMMAND
+        cargo rustc --color never --target=${target_triple} -- --print=native-static-libs
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test"
+        RESULT_VARIABLE cargo_build_result
+        ERROR_VARIABLE cargo_build_error_message
+    )
+    if(cargo_build_result)
+        # todo: this is expected for no_std crates, log debug output and ignore
+        message(FATAL_ERROR "Determining required native libraries - failed: ${cargo_build_result}."
+            "\n error: ${cargo_build_error_message}")
+    else()
+        # The pattern starts with `native-static-libs:` and goes to the end of the line.
+        if(cargo_build_error_message MATCHES "native-static-libs: ([^\r\n]+)\r?\n")
+            message(STATUS "Required static libs for target ${target_triple}: ${CMAKE_MATCH_1}")
+            # We could consider removing the `-l` here.
+            set(libs_list "${CMAKE_MATCH_1}")
+        else()
+            message(FATAL_ERROR "Regex did not match on:\n${cargo_build_error_message}")
+        endif()
+    endif()
+    set("${out_libs}" "${libs_list}" PARENT_SCOPE)
+endfunction()
+
 # Hardcoded, best effort approach
 function(_corrosion_determine_libs arch vendor os env out_libs)
     if(os STREQUAL "windows")
@@ -694,7 +719,33 @@ set(Rust_CARGO_TARGET_ARCH "${rust_arch}" CACHE INTERNAL "Target architecture")
 set(Rust_CARGO_TARGET_VENDOR "${rust_vendor}" CACHE INTERNAL "Target vendor")
 set(Rust_CARGO_TARGET_OS "${rust_os}" CACHE INTERNAL "Target Operating System")
 set(Rust_CARGO_TARGET_ENV "${rust_env}" CACHE INTERNAL "Target environment")
-set(Rust_CARGO_TARGET_LINK_NATIVE_LIBS "${rust_libs}" CACHE INTERNAL
+
+message(STATUS "Determining required link libraries for target ${todo}")
+# Cleanup on reconfigure to get a cleans state (in case we change something in the future)
+file(REMOVE_RECURSE "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test/")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal")
+# Create a staticlib application for testing purposes
+execute_process(
+    COMMAND "${Rust_CARGO_CACHED}" new --lib corrosion_staticlib_test
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal"
+    RESULT_VARIABLE cargo_new_result
+    ERROR_QUIET
+)
+if(cargo_new_result)
+    file(REMOVE_RECURSE "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test/")
+    # todo: we could probably fallback to the hardcoded solution we currently use.
+    message(FATAL_ERROR "Determining required link libraries: failed to create test library: ${cargo_new_result}")
+endif()
+file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test/Cargo.toml"
+    "[lib]\ncrate-type=[\"staticlib\"]")
+
+# todo: also determine required libs for HOST_BUILD
+_corrosion_determine_libs_new("${Rust_CARGO_TARGET_CACHED}" rust_libs_new)
+message(DEBUG "Determined required libs as follows:\n"
+    "new method: ${rust_libs_new}\n"
+    "old method: ${rust_libs}"
+)
+set(Rust_CARGO_TARGET_LINK_NATIVE_LIBS "${rust_libs_new}" CACHE INTERNAL
     "Required native libraries when linking Rust static libraries")
 
 # Set the input variables as non-cache variables so that the variables are available after
