@@ -129,8 +129,9 @@ endfunction()
 
 function(_corrosion_determine_libs_new target_triple out_libs)
     execute_process(
-        COMMAND
-        cargo rustc --color never --target=${target_triple} -- --print=native-static-libs
+        COMMAND ${CMAKE_COMMAND} -E env
+            "CARGO_BUILD_RUST=${Rust_COMPILER_CACHED}"
+        ${Rust_CARGO_CACHED} rustc --verbose --color never --target=${target_triple} -- --print=native-static-libs
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test"
         RESULT_VARIABLE cargo_build_result
         ERROR_VARIABLE cargo_build_error_message
