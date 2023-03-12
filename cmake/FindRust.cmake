@@ -721,6 +721,7 @@ else()
 endif()
 
 _corrosion_parse_target_triple("${Rust_CARGO_TARGET_CACHED}" rust_arch rust_vendor rust_os rust_env)
+_corrosion_parse_target_triple("${Rust_CARGO_HOST_TARGET_CACHED}" rust_host_arch rust_host_vendor rust_host_os rust_host_env)
 _corrosion_determine_libs("${rust_arch}" "${rust_vendor}" "${rust_os}" "${rust_env}" rust_libs)
 
 set(Rust_CARGO_TARGET_ARCH "${rust_arch}" CACHE INTERNAL "Target architecture")
@@ -728,7 +729,12 @@ set(Rust_CARGO_TARGET_VENDOR "${rust_vendor}" CACHE INTERNAL "Target vendor")
 set(Rust_CARGO_TARGET_OS "${rust_os}" CACHE INTERNAL "Target Operating System")
 set(Rust_CARGO_TARGET_ENV "${rust_env}" CACHE INTERNAL "Target environment")
 
-message(STATUS "Determining required link libraries for target ${todo}")
+set(Rust_CARGO_HOST_TARGET_ARCH "${rust_host_arch}" CACHE INTERNAL "Host architecture")
+set(Rust_CARGO_HOST_TARGET_VENDOR "${rust_host_vendor}" CACHE INTERNAL "Host vendor")
+set(Rust_CARGO_HOST_TARGET_OS "${rust_host_os}" CACHE INTERNAL "Host Operating System")
+set(Rust_CARGO_HOST_TARGET_ENV "${rust_host_env}" CACHE INTERNAL "Host environment")
+
+message(STATUS "Determining required link libraries for target ${Rust_CARGO_TARGET_CACHED}")
 # Cleanup on reconfigure to get a cleans state (in case we change something in the future)
 file(REMOVE_RECURSE "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test/")
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal")
@@ -747,14 +753,18 @@ endif()
 file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test/Cargo.toml"
     "[lib]\ncrate-type=[\"staticlib\"]")
 
-# todo: also determine required libs for HOST_BUILD
 _corrosion_determine_libs_new("${Rust_CARGO_TARGET_CACHED}" rust_libs_new)
+# todo: only do the host checking when cross_compiling.
+_corrosion_determine_libs_new("${Rust_CARGO_HOST_TARGET_CACHED}" rust_host_libs_new)
+
 message(DEBUG "Determined required libs as follows:\n"
     "new method: ${rust_libs_new}\n"
     "old method: ${rust_libs}"
 )
 set(Rust_CARGO_TARGET_LINK_NATIVE_LIBS "${rust_libs_new}" CACHE INTERNAL
     "Required native libraries when linking Rust static libraries")
+set(Rust_CARGO_HOST_TARGET_LINK_NATIVE_LIBS "${rust_host_libs_new}" CACHE INTERNAL
+        "Required native libraries when linking Rust static libraries")
 
 # Set the input variables as non-cache variables so that the variables are available after
 # `find_package`, even if the values were evaluated to defaults.
