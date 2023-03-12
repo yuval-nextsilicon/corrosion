@@ -132,7 +132,7 @@ function(_corrosion_determine_libs_new target_triple out_libs)
         COMMAND ${CMAKE_COMMAND} -E env
             "CARGO_BUILD_RUST=${Rust_COMPILER_CACHED}"
         ${Rust_CARGO_CACHED} rustc --verbose --color never --target=${target_triple} -- --print=native-static-libs
-        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test"
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/corrosion/required_libs"
         RESULT_VARIABLE cargo_build_result
         ERROR_VARIABLE cargo_build_error_message
     )
@@ -736,21 +736,21 @@ set(Rust_CARGO_HOST_TARGET_ENV "${rust_host_env}" CACHE INTERNAL "Host environme
 
 message(STATUS "Determining required link libraries for target ${Rust_CARGO_TARGET_CACHED}")
 # Cleanup on reconfigure to get a cleans state (in case we change something in the future)
-file(REMOVE_RECURSE "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test/")
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal")
+file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/corrosion/required_libs")
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/corrosion")
 # Create a staticlib application for testing purposes
 execute_process(
-    COMMAND "${Rust_CARGO_CACHED}" new --lib corrosion_staticlib_test
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal"
+    COMMAND "${Rust_CARGO_CACHED}" new --lib required_libs
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/corrosion"
     RESULT_VARIABLE cargo_new_result
     ERROR_QUIET
 )
 if(cargo_new_result)
-    file(REMOVE_RECURSE "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test/")
+    file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/corrosion/required_libs")
     # todo: we could probably fallback to the hardcoded solution we currently use.
     message(FATAL_ERROR "Determining required link libraries: failed to create test library: ${cargo_new_result}")
 endif()
-file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/corrosion_internal/corrosion_staticlib_test/Cargo.toml"
+file(APPEND "${CMAKE_BINARY_DIR}/corrosion/required_libs/Cargo.toml"
     "[lib]\ncrate-type=[\"staticlib\"]")
 
 _corrosion_determine_libs_new("${Rust_CARGO_TARGET_CACHED}" rust_libs_new)
